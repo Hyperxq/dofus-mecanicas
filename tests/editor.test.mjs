@@ -64,3 +64,11 @@ test("the portal tool opens portals anywhere, keeps the queue of four and closes
   assert.equal(closed.state.portals.some((p) => p.id === "B"), false);
   assert.equal(applyEdit(base(), "portal", { x: 5, y: 5 }).changed, false);
 });
+
+test("the hole tool toggles holes on free cells and portals cannot open on holes", () => {
+  const withHole = applyEdit(base(), "hole", { x: 4, y: 4 });
+  assert.equal(withHole.state.holes.has("4,4"), true);
+  assert.equal(applyEdit(withHole.state, "hole", { x: 4, y: 4 }).state.holes.has("4,4"), false);
+  assert.equal(applyEdit(withHole.state, "portal", { x: 4, y: 4 }).changed, false);
+  assert.equal(applyEdit(withHole.state, "erase", { x: 4, y: 4 }).state.holes.size, 0);
+});

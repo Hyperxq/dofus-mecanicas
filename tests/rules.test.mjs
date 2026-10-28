@@ -191,3 +191,64 @@ test("movement stays within PM, routes around obstacles and ends on portals", ()
   assert.equal(reach.has("0,3"), false);
   assert.equal(reach.has("2,2"), false);
 });
+
+test("holes do not block line of sight but walls do", () => {
+  const state = board({
+    caster: { x: 0, y: 3 },
+    holes: new Set(["2,3"]),
+    portals: [{ id: "A", x: 4, y: 3 }, { id: "B", x: 8, y: 8 }],
+    entities: [{ id: "t", x: 12, y: 8 }],
+  });
+  assert.equal(castSpell(state, SPELLS.golpe, { x: 4, y: 3 }).ok, true);
+  const walled = { ...state, blocked: new Set(["2,3"]) };
+  assert.equal(castSpell(walled, SPELLS.golpe, { x: 4, y: 3 }).reason, "los-entrada");
+});
+
+test("walls between portals never block the network", () => {
+  const state = board({
+    caster: { x: 2, y: 7 },
+    blocked: new Set(["8,6", "8,7", "8,8"]),
+    portals: [{ id: "A", x: 4, y: 7 }, { id: "B", x: 11, y: 7 }],
+    entities: [{ id: "t", x: 13, y: 7 }],
+  });
+  const res = castSpell(state, SPELLS.golpe, { x: 4, y: 7 });
+  assert.equal(res.ok, true);
+  assert.deepEqual(res.hits, ["t"]);
+});
+
+test("a wall next to the exit cuts the second segment", () => {
+  const state = board({
+    caster: { x: 2, y: 7 },
+    blocked: new Set(["12,7"]),
+    portals: [{ id: "A", x: 4, y: 7 }, { id: "B", x: 11, y: 7 }],
+  });
+  assert.equal(castSpell(state, SPELLS.golpe, { x: 4, y: 7 }).reason, "los-salida");
+});
+
+test("a projected impact on a hole is lost", () => {
+  const state = board({
+    caster: { x: 2, y: 7 },
+    holes: new Set(["13,7"]),
+    portals: [{ id: "A", x: 4, y: 7 }, { id: "B", x: 11, y: 7 }],
+  });
+  assert.equal(castSpell(state, SPELLS.golpe, { x: 4, y: 7 }).reason, "agujero");
+});
+
+test("holes stop movement and pushes", () => {
+  const state = board({
+    caster: { x: 2, y: 7 },
+    holes: new Set(["7,7", "1,7", "2,6", "2,8"]),
+    entities: [{ id: "t", x: 5, y: 7 }],
+  });
+  const move = castSpell(state, SPELLS.insulto, { x: 5, y: 7 }).moves[0];
+  assert.deepEqual(move.to, { x: 6, y: 7 });
+  assert.equal(move.collided, true);
+  const reach = reachable(state, 2);
+  assert.equal(reach.has("1,7") || reach.has("2,6") || reach.has("2,8"), false);
+  assert.ok(reach.has("3,7"));
+});
+
+test("hole cells are never valid spell targets", () => {
+  const state = board({ caster: { x: 2, y: 7 }, holes: new Set(["5,7"]) });
+  assert.equal(castSpell(state, SPELLS.golpe, { x: 5, y: 7 }).reason, "agujero");
+});

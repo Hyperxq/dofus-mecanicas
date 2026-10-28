@@ -8,6 +8,7 @@ const build = (lesson) => {
   return {
     cols: 15, rows: 15,
     blocked: new Set(d.blocked.map(([x, y]) => `${x},${y}`)),
+    holes: new Set((d.holes || []).map(([x, y]) => `${x},${y}`)),
     portals: d.portals, caster: d.caster, entities: d.entities,
   };
 };
@@ -21,6 +22,7 @@ test("every lesson builds a valid board", () => {
     for (const c of [s.caster, ...s.portals, ...s.entities]) {
       assert.ok(c.x >= 0 && c.y >= 0 && c.x < 15 && c.y < 15, `${l.title}: cell out of board`);
       assert.equal(s.blocked.has(key(c)), false, `${l.title}: piece on an obstacle`);
+      assert.equal(s.holes.has(key(c)), false, `${l.title}: piece on a hole`);
     }
   }
 });
@@ -36,6 +38,8 @@ test("projection lessons are solvable from a reachable cell", () => {
     ["Entrar por uno, salir por otro", "golpe", null, { x: 5, y: 5 }],
     ["El portal copia tu lanzamiento", "golpe", { x: 4, y: 5 }, { x: 6, y: 4 }],
     ["Línea de visión en dos tramos", "golpe", { x: 5, y: 5 }, { x: 6, y: 7 }],
+    ["Muros, agujeros y portales", "golpe", null, { x: 6, y: 7 }],
+    ["Muros, agujeros y portales", "insulto", null, { x: 6, y: 7 }],
     ["Áreas a través de portales", "cruz", { x: 3, y: 5 }, { x: 5, y: 4 }],
     ["Empujar a través de portales", "insulto", null, { x: 6, y: 6 }],
     ["Empujar dentro de un portal", "insulto", null, { x: 6, y: 7 }],

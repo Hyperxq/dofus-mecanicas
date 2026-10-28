@@ -1,4 +1,4 @@
-import { key, same, portalAt, closePortal, addPortal } from "./rules.js";
+import { key, same, portalAt, closePortal, addPortal, holesOf } from "./rules.js";
 
 // Pure playground edits: each returns a new state and never mutates the given one.
 export function applyEdit(state, tool, cell) {
@@ -6,8 +6,14 @@ export function applyEdit(state, tool, cell) {
   const entity = state.entities.find((e) => same(e, cell));
   const portal = portalAt(state.portals, cell);
   const rock = state.blocked.has(k);
+  const hole = holesOf(state).has(k);
   const isCaster = same(state.caster, cell);
-  const free = !entity && !portal && !rock && !isCaster;
+  const free = !entity && !portal && !rock && !hole && !isCaster;
+  const toggledHoles = () => {
+    const holes = new Set(holesOf(state));
+    if (hole) holes.delete(k); else holes.add(k);
+    return holes;
+  };
   const keep = (message) => ({ state, changed: false, message });
   const next = (patch) => ({ state: { ...state, ...patch }, changed: true });
 
@@ -33,9 +39,13 @@ export function applyEdit(state, tool, cell) {
       blocked.add(k);
       return next({ blocked });
     }
+    case "hole":
+      if (hole) return next({ holes: toggledHoles() });
+      return free ? next({ holes: toggledHoles() }) : keep("Esa casilla está ocupada.");
     case "erase": {
       if (entity) return next({ entities: state.entities.filter((e) => e !== entity) });
       if (portal) return next({ portals: closePortal(state.portals, portal.id) });
+      if (hole) return next({ holes: toggledHoles() });
       if (rock) { const blocked = new Set(state.blocked); blocked.delete(k); return next({ blocked }); }
       return keep("No hay nada que borrar ahí.");
     }

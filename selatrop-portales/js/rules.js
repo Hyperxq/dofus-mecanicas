@@ -8,6 +8,12 @@ export const same = (a, b) => !!a && !!b && a.x === b.x && a.y === b.y;
 export const dist = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 export const inside = (state, c) => c.x >= 0 && c.y >= 0 && c.x < state.cols && c.y < state.rows;
 
+// Walls (`blocked`) stop movement and line of sight; holes stop movement but let sight through.
+const NONE = new Set();
+export const holesOf = (state) => state.holes || NONE;
+const isHole = (state, c) => holesOf(state).has(key(c));
+const solid = (state, c) => state.blocked.has(key(c)) || isHole(state, c);
+
 export const SPELLS = {
   golpe: { id: "golpe", name: "Golpe", range: [1, 8], zone: "single", effect: null,
     blurb: "Una sola casilla. Sirve para ver si el objetivo fue afectado." },
@@ -117,7 +123,7 @@ export function rangeCells(state, spell) {
   const out = [];
   for (let y = 0; y < state.rows; y++) for (let x = 0; x < state.cols; x++) {
     const c = { x, y };
-    if (state.blocked.has(key(c)) || !inRange(state, spell, c)) continue;
+    if (solid(state, c) || !inRange(state, spell, c)) continue;
     out.push({ ...c, los: hasLineOfSight(state.caster, c, blockers) });
   }
   return out;
@@ -126,6 +132,7 @@ export function rangeCells(state, spell) {
 export function castSpell(state, spell, target) {
   const fail = (reason, extra = {}) => ({ ok: false, reason, hits: [], moves: [], zone: [], ...extra });
   if (!inRange(state, spell, target)) return fail("rango");
+  if (isHole(state, target)) return fail("agujero");
   const blockers = losBlockers(state);
   const vec = { x: target.x - state.caster.x, y: target.y - state.caster.y };
   const dir = direction(vec.x, vec.y);
@@ -141,6 +148,7 @@ export function castSpell(state, spell, target) {
     segments.push([route.exit, landing]);
     if (!inside(state, landing)) return fail("fuera", { route, entry, landing, segments });
     if (state.blocked.has(key(landing))) return fail("obstaculo", { route, entry, landing, segments });
+    if (isHole(state, landing)) return fail("agujero", { route, entry, landing, segments });
     if (!hasLineOfSight(route.exit, landing, blockers)) return fail("los-salida", { route, entry, landing, segments });
   } else if (!hasLineOfSight(state.caster, target, blockers)) {
     return fail("los");
@@ -186,7 +194,7 @@ function slide(state, occupied, from, dir, cells, stopAt) {
   for (let i = 0; i < cells && dir; i++) {
     if (stopAt && same(pos, stopAt)) break;
     const next = { x: pos.x + dir.x, y: pos.y + dir.y };
-    if (!inside(state, next) || state.blocked.has(key(next)) || occupied.has(key(next))) { collided = true; break; }
+    if (!inside(state, next) || solid(state, next) || occupied.has(key(next))) { collided = true; break; }
     const portal = portalAt(state.portals, next);
     const route = portal ? computeRoute(state.portals, portal.id) : null;
     if (route) {
@@ -215,7 +223,7 @@ export function reachable(state, pm) {
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const c = { x: cell.x + dx, y: cell.y + dy };
         const k = key(c);
-        if (seen.has(k) || !inside(state, c) || state.blocked.has(k) || occupied.has(k)) continue;
+        if (seen.has(k) || !inside(state, c) || solid(state, c) || occupied.has(k)) continue;
         seen.add(k);
         const entry = { cell: c, path: [...path, c] };
         out.set(k, entry);

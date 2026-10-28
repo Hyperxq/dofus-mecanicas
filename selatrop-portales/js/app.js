@@ -33,7 +33,8 @@ const REASONS = {
   "los-entrada": "No hay línea de visión hasta el portal de entrada.",
   "los-salida": "Desde el portal de salida no hay línea de visión hasta el impacto.",
   fuera: "El impacto queda fuera de la cuadrícula: el hechizo se pierde.",
-  obstaculo: "El impacto cae sobre un obstáculo.",
+  obstaculo: "El impacto cae sobre un muro.",
+  agujero: "No se puede apuntar a un agujero: el hechizo se pierde.",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -57,6 +58,7 @@ function boardFrom(d) {
   return {
     cols: COLS, rows: ROWS,
     blocked: new Set(d.blocked.map(([x, y]) => `${x},${y}`)),
+    holes: new Set((d.holes || []).map(([x, y]) => `${x},${y}`)),
     portals: d.portals.map((p) => ({ ...p })),
     caster: { ...d.caster },
     entities: d.entities.map((e) => ({ ...e })),
@@ -73,12 +75,13 @@ function loadPlayground() {
 
 function savePlayground() {
   if (!lesson.playground) return;
-  const d = { blocked: [...S.blocked].map((k) => k.split(",").map(Number)), portals: S.portals, caster: S.caster, entities: S.entities };
+  const cells = (set) => [...set].map((k) => k.split(",").map(Number));
+  const d = { blocked: cells(S.blocked), holes: cells(R.holesOf(S)), portals: S.portals, caster: S.caster, entities: S.entities };
   try { localStorage.setItem(PLAY_KEY, JSON.stringify(d)); } catch { /* storage unavailable */ }
 }
 
 function syncWorld() {
-  world.setBlocked(S.blocked);
+  world.setTerrain(S.blocked, R.holesOf(S));
   world.setPortals(S.portals);
   world.setActors(S.caster, S.entities);
 }
@@ -259,7 +262,7 @@ function portalCells() {
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
     const c = { x, y };
     const d = R.dist(S.caster, c);
-    if (d >= PORTAL_RANGE[0] && d <= max && !S.blocked.has(R.key(c)) && !occupied(c) && !R.portalAt(S.portals, c)) out.push(c);
+    if (d >= PORTAL_RANGE[0] && d <= max && !S.blocked.has(R.key(c)) && !R.holesOf(S).has(R.key(c)) && !occupied(c) && !R.portalAt(S.portals, c)) out.push(c);
   }
   return out;
 }
@@ -274,7 +277,7 @@ function previewAt(cell) {
 }
 
 function refresh() {
-  if (busy) { world.setHighlights({}); world.setPreview(null); world.setHover(null); renderPreviewCard(null); return; }
+  if (busy) { world.setHighlights({}); world.setTargets([]); world.setPreview(null); world.setHover(null); renderPreviewCard(null); return; }
   const hl = {};
   let segs = null, impact = {};
   const focus = armedCell || hoverCell;
@@ -300,6 +303,7 @@ function refresh() {
     }
   }
   world.setHighlights(hl);
+  world.setTargets(pv?.res?.ok ? pv.res.hits : []);
   world.setPreview(segs, impact);
   world.setHover(focus);
   renderNetwork();
@@ -589,7 +593,7 @@ document.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("clic
 $("free-range").addEventListener("change", (ev) => { freeRange = ev.target.checked; refresh(); });
 $("pg-clear").addEventListener("click", () => {
   if (busy) return;
-  S = boardFrom({ caster: S.caster, portals: [], entities: [], blocked: [] });
+  S = boardFrom({ caster: S.caster, portals: [], entities: [], blocked: [], holes: [] });
   syncWorld();
   savePlayground();
   refresh();

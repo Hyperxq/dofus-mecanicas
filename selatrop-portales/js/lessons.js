@@ -94,7 +94,7 @@ export const LESSONS = [
   {
     title: "Línea de visión en dos tramos",
     body: `<p>Un hechizo proyectado necesita línea de visión <b>dos veces</b>: de vos a la entrada, y de la salida al impacto. Los obstáculos y las criaturas la cortan; los portales no.</p>
-      <p>Las casillas azul claro están en alcance pero sin visión. Probá lanzar por <b>A</b>, después rodeá la roca en el modo <b>Mover</b> y volvé a intentarlo.</p>`,
+      <p>Las casillas azul claro están en alcance pero sin visión. Probá lanzar por <b>A</b>, después rodeá el muro en el modo <b>Mover</b> y volvé a intentarlo.</p>`,
     tools: ["golpe"],
     move: true,
     preview: true,
@@ -110,6 +110,31 @@ export const LESSONS = [
     ],
   },
   {
+    title: "Muros, agujeros y portales",
+    body: `<p>Hay dos clases de casillas que no se pueden pisar:</p>
+      <ul>
+        <li><b>Muros</b> (bloques de piedra): cortan la línea de visión y el movimiento.</li>
+        <li><b>Agujeros</b> (casillas oscuras): no se pisan, pero <b>la visión pasa por encima</b>.</li>
+      </ul>
+      <p>La red de portales <b>no se ve afectada por los muros</b>: el hechizo salta de portal a portal. Solo cuentan los dos tramos rectos, de vos a la entrada y de la salida al impacto.</p>
+      <p>Lanzá por <b>A</b>: el hechizo pasa sobre el agujero y la red cruza el muro. Después empujá al muñeco contra el agujero con <b>Insulto</b>.</p>`,
+    note: "Aproximación: que los agujeros dejen pasar la visión y frenen empujes viene del modo táctico; comprobalo en el juego.",
+    tools: ["golpe", "insulto"],
+    move: true,
+    preview: true,
+    setup: () => ({
+      caster: { x: 4, y: 7 },
+      portals: portals(["A", 6, 7], ["B", 11, 11]),
+      entities: [dummy(1, 13, 11)],
+      blocked: [[8, 5], [8, 6], [8, 7], [8, 8], [8, 9], [9, 5], [9, 6], [9, 7], [9, 8], [9, 9]],
+      holes: [[5, 7], [14, 11]],
+    }),
+    objectives: [
+      { text: "Afectá al muñeco a través de A, por encima del agujero y a través del muro", done: cast("golpe", (r) => r.projected && r.hits.includes("m1")) },
+      { text: "Empujá al muñeco contra el agujero con Insulto", done: cast("insulto", (r) => r.moves.some((m) => m.collided)) },
+    ],
+  },
+  {
     title: "Áreas a través de portales",
     body: `<p>La zona de un hechizo se dibuja <b>alrededor del impacto</b>, después de salir del portal. Una cruz que sale de un portal afecta a todos los que estén en esa cruz.</p>
       <p>Usá <b>Cruz</b> para afectar a los dos muñecos con un solo lanzamiento.</p>`,
@@ -122,12 +147,12 @@ export const LESSONS = [
   {
     title: "Empujar a través de portales",
     body: `<p>Un empuje proyectado empuja en la <b>misma dirección de tu lanzamiento</b>. Si algo choca con un obstáculo, otra criatura o el borde, se frena.</p>
-      <p><b>Insulto</b> golpea una línea de 3 casillas perpendicular y empuja 2. Mandá al muñeco contra la roca.</p>`,
+      <p><b>Insulto</b> golpea una línea de 3 casillas perpendicular y empuja 2. Mandá al muñeco contra el muro.</p>`,
     tools: ["insulto"],
     move: true,
     preview: true,
     setup: () => ({ caster: { x: 4, y: 6 }, portals: portals(["A", 6, 6], ["B", 10, 10]), entities: [dummy(1, 12, 10)], blocked: [[14, 10]] }),
-    objectives: [{ text: "Empujá al muñeco contra la roca", done: cast("insulto", (r) => r.moves.some((m) => m.collided)) }],
+    objectives: [{ text: "Empujá al muñeco contra el muro", done: cast("insulto", (r) => r.moves.some((m) => m.collided)) }],
   },
   {
     title: "Empujar dentro de un portal",

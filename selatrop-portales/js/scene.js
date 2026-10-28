@@ -5,7 +5,7 @@ const COLORS = {
   rangeNoLos: "#9298dc",
   move: "#7dff8a",
   path: "#8ef08f",
-  zone: "#ea4a2c",
+  zone: "#f2662a",
   portalTarget: "#46d8e4",
 };
 
@@ -306,17 +306,34 @@ export function createWorld({ canvas, overlay, cols, rows }) {
     scene.add(hover);
   }
 
-  // Obstacles inside the grid.
+  // Terrain inside the grid: walls are raised stone blocks (they cut sight), holes are dark pits (sight passes over).
   const obstacles = new THREE.Group();
   scene.add(obstacles);
-  function setBlocked(blocked) {
+  const wallMats = ["#8c8677", "#7f7a6c", "#979080"].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true }));
+  const wallTop = new THREE.MeshStandardMaterial({ color: "#aaa392", roughness: 0.9, flatShading: true });
+  const holeRim = new THREE.MeshBasicMaterial({ color: "#2b2418" });
+  const holeVoid = new THREE.MeshBasicMaterial({ color: "#07090a" });
+  const holeRimGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const holeVoidGeo = new THREE.PlaneGeometry(0.84, 0.84).rotateX(-Math.PI / 2);
+  function setTerrain(blocked, holes = []) {
     obstacles.clear();
     for (const k of blocked) {
       const [x, y] = k.split(",").map(Number);
       const r = rng(x * 131 + y * 17 + 3);
-      const o = rock(r, 1.5);
-      o.position.copy(toWorld({ x, y }));
-      obstacles.add(o);
+      const h = 0.62 + r() * 0.3;
+      const block = new THREE.Mesh(new THREE.BoxGeometry(0.96, h, 0.96), [wallMats[0], wallMats[1], wallTop, wallMats[2], wallMats[1], wallMats[0]]);
+      block.position.copy(toWorld({ x, y }, h / 2));
+      block.castShadow = block.receiveShadow = true;
+      obstacles.add(block);
+    }
+    for (const k of holes) {
+      const [x, y] = k.split(",").map(Number);
+      const rim = new THREE.Mesh(holeRimGeo, holeRim);
+      rim.position.copy(toWorld({ x, y }, 0.014));
+      const pit = new THREE.Mesh(holeVoidGeo, holeVoid);
+      pit.position.copy(toWorld({ x, y }, 0.015));
+      rim.renderOrder = pit.renderOrder = 1;
+      obstacles.add(rim, pit);
     }
   }
 
@@ -481,17 +498,37 @@ export function createWorld({ canvas, overlay, cols, rows }) {
 
   function makeDummy() {
     const g = new THREE.Group();
-    g.add(teamRing("#e0402e"));
+    const ring = teamRing("#e0402e");
+    g.add(ring);
+    const skin = burlap.clone();
     const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.9, 6), post);
     stick.position.y = 0.45;
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.21, 0.42, 8), burlap);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.21, 0.42, 8), skin);
     body.position.y = 0.5;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), burlap);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), skin);
     head.position.y = 0.85;
     const arms = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.07, 0.07), post);
     arms.position.y = 0.62;
     for (const m of [stick, body, head, arms]) { m.castShadow = true; g.add(m); }
+    g.userData = { ring, skin };
     return g;
+  }
+
+  // Dofus marks the creatures a spell would hit: orange while aiming, a red flash on impact.
+  function tint(a, color, strength) {
+    const { ring, skin } = a.group.userData;
+    if (!ring) return;
+    ring.material.color.set(strength > 0 ? color : "#e0402e");
+    skin.emissive.set(color);
+    skin.emissiveIntensity = strength;
+  }
+  let targeted = new Set();
+  function setTargets(ids) {
+    targeted = new Set(ids);
+    for (const [id, a] of actors) if (id !== "caster") tint(a, "#ff7a1a", targeted.has(id) ? 0.55 : 0);
+  }
+  function flashHit(a) {
+    return tween(520, (k) => tint(a, "#ff2a12", Math.sin(k * Math.PI) * 0.9)).then(() => tint(a, "#ff7a1a", 0));
   }
 
   function setActors(caster, entities) {
@@ -625,10 +662,9 @@ export function createWorld({ canvas, overlay, cols, rows }) {
     for (const id of res.hits) {
       const a = actors.get(id);
       if (!a) continue;
-      floatText(a.cell, "Afectado", "hit");
+      flashHit(a);
       shake(a.group);
     }
-    if (!res.hits.length) floatText(res.landing, "Sin objetivo", "miss");
 
     let n = 1;
     for (const m of res.moves) {
@@ -781,7 +817,8 @@ export function createWorld({ canvas, overlay, cols, rows }) {
   requestAnimationFrame(frame);
 
   return {
-    setBlocked,
+    setTerrain,
+    setTargets,
     setPortals,
     setActors,
     setPreview,
