@@ -2,19 +2,74 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Portales del Selatrop</title>
-<style>
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #14171d; color: #efe6d2;
-    font-family: "Trebuchet MS", sans-serif; padding: 16px; text-align: center; }
-  a { color: #46d2dc; }
-</style>
+<meta name="description" content="Tutorial interactivo de los portales del Selatrop en Dofus: rutas, proyección, áreas, empujes y atracciones.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Signika:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
 </head>
 <body>
-  <main>
-    <h1>Portales del Selatrop</h1>
-    <p>El tutorial interactivo está en construcción.</p>
-    <p><a href="../">Volver al inicio</a></p>
-  </main>
+  <div id="stage">
+    <canvas id="world" aria-label="Mapa de combate isométrico"></canvas>
+    <div id="overlay" aria-hidden="true"></div>
+  </div>
+
+  <header id="topbar">
+    <a class="brand" href="../">Dofus Mecánicas</a>
+    <span class="topbar-title">Portales del Selatrop</span>
+  </header>
+
+  <aside id="panel" class="frame" aria-labelledby="lesson-title">
+    <div class="panel-head">
+      <span id="lesson-count" class="eyebrow">Lección 1</span>
+      <button type="button" id="collapse" class="ghost" aria-expanded="true" aria-controls="lesson-content">Ocultar</button>
+    </div>
+    <div id="lesson-content">
+      <h1 id="lesson-title"></h1>
+      <div id="lesson-body" class="lesson-body"></div>
+      <p id="lesson-note" class="note" hidden></p>
+      <div id="quiz" class="quiz" hidden>
+        <p id="quiz-q" class="quiz-q"></p>
+        <div id="quiz-options" class="quiz-options"></div>
+        <p id="quiz-feedback" class="quiz-feedback" aria-live="polite"></p>
+      </div>
+      <h2 class="eyebrow">Objetivos</h2>
+      <ul id="objectives" class="objectives"></ul>
+      <p id="move-hint" class="hint">Sin hechizo elegido, tocá una casilla verde para moverte (6 PM).</p>
+    </div>
+    <div class="panel-foot">
+      <button type="button" id="prev" class="btn">Anterior</button>
+      <button type="button" id="reset" class="btn ghost">Reiniciar</button>
+      <button type="button" id="next" class="btn primary">Siguiente</button>
+    </div>
+    <label class="lesson-jump">
+      <span class="eyebrow">Ir a</span>
+      <select id="lesson-select" aria-label="Elegir lección"></select>
+    </label>
+  </aside>
+
+  <section id="hud" class="frame" aria-label="Estado del combate">
+    <h2 class="eyebrow">Red de portales</h2>
+    <p id="network" class="network"></p>
+    <h2 class="eyebrow">Último hechizo</h2>
+    <p id="result" class="result" aria-live="polite"></p>
+    <div class="zoom">
+      <button type="button" id="zoom-out" class="btn ghost" aria-label="Alejar">−</button>
+      <button type="button" id="zoom-in" class="btn ghost" aria-label="Acercar">+</button>
+    </div>
+  </section>
+
+  <div id="bottombar">
+    <nav id="spellbar" class="frame" aria-label="Hechizos"></nav>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
