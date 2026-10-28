@@ -115,6 +115,18 @@ void main() {
   gl_FragColor = vec4(uColor * alpha, alpha);
 }`;
 
+const RIBBON_FRAG = `
+uniform float uTime; uniform float uLen; uniform vec3 uColor;
+varying vec2 vUv;
+void main() {
+  float across = abs(vUv.y * 2.0 - 1.0);
+  float core = 1.0 - smoothstep(0.18, 0.55, across);
+  float halo = (1.0 - across) * 0.4;
+  float dash = step(0.42, fract(vUv.x * uLen * 2.2 - uTime * 2.4));
+  float alpha = core * (0.45 + 0.55 * dash) + halo;
+  gl_FragColor = vec4(uColor * alpha, alpha);
+}`;
+
 export function createWorld({ canvas, overlay, cols, rows }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -305,23 +317,59 @@ export function createWorld({ canvas, overlay, cols, rows }) {
     }
   }
 
-  // Route preview lines.
+  // Route preview: glowing ground ribbons with flowing dashes, a chevron per leg and an impact marker.
+  // WebGL ignores line widths, so legs are drawn as flat quads instead of lines.
   const preview = new THREE.Group();
   scene.add(preview);
-  function dashed(points, color, h) {
-    const geo = new THREE.BufferGeometry().setFromPoints(points.map((c) => toWorld(c, h)));
-    const line = new THREE.Line(geo, new THREE.LineDashedMaterial({ color, dashSize: 0.22, gapSize: 0.14, transparent: true, opacity: 0.95, depthTest: false }));
-    line.computeLineDistances();
-    line.renderOrder = 5;
-    return line;
+  const previewUniforms = [];
+  let impactMarker = null;
+  const chevron = new THREE.ShapeGeometry(new THREE.Shape([
+    new THREE.Vector2(0.2, 0), new THREE.Vector2(-0.12, 0.16), new THREE.Vector2(-0.04, 0), new THREE.Vector2(-0.12, -0.16),
+  ])).rotateX(-Math.PI / 2);
+  const impactGeo = new THREE.RingGeometry(0.4, 0.5, 4, 1).rotateZ(Math.PI / 4).rotateX(-Math.PI / 2);
+
+  function ribbon(a, b, color) {
+    const p = toWorld(a, 0.06), q = toWorld(b, 0.06);
+    const dx = q.x - p.x, dz = q.z - p.z;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.01) return;
+    const angle = Math.atan2(-dz, dx);
+    const uniforms = { uTime: { value: 0 }, uLen: { value: len }, uColor: { value: new THREE.Color(color) } };
+    previewUniforms.push(uniforms);
+    const band = new THREE.Mesh(
+      new THREE.PlaneGeometry(len, 0.2).rotateX(-Math.PI / 2),
+      new THREE.ShaderMaterial({ uniforms, vertexShader: PORTAL_VERT, fragmentShader: RIBBON_FRAG, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }),
+    );
+    band.position.set((p.x + q.x) / 2, 0.06, (p.z + q.z) / 2);
+    band.rotation.y = angle;
+    band.renderOrder = 6;
+    const tip = new THREE.Mesh(chevron, new THREE.MeshBasicMaterial({ color, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+    tip.position.set(q.x - (dx / len) * 0.42, 0.07, q.z - (dz / len) * 0.42);
+    tip.rotation.y = angle;
+    tip.renderOrder = 7;
+    preview.add(band, tip);
   }
-  function setPreview(segments) {
+
+  function setPreview(segments, { landing = null, ok = true } = {}) {
+    for (const m of preview.children) {
+      if (m.geometry !== chevron && m.geometry !== impactGeo) m.geometry.dispose();
+      m.material.dispose();
+    }
     preview.clear();
+    previewUniforms.length = 0;
+    impactMarker = null;
     if (!segments) return;
     segments.forEach(([a, b], i) => {
-      const color = i === 0 ? "#f0b43c" : i === segments.length - 1 && segments.length > 1 ? "#6ff08a" : "#46d8e4";
-      preview.add(dashed([a, b], color, 0.12));
+      const last = i === segments.length - 1;
+      const color = !ok && last ? "#ff5a3c" : i === 0 ? "#f5b941" : last && segments.length > 1 ? "#72f59a" : "#46d8e4";
+      ribbon(a, b, color);
     });
+    if (landing) {
+      impactMarker = new THREE.Mesh(impactGeo, new THREE.MeshBasicMaterial({ color: ok ? "#fff0b8" : "#ff5a3c", transparent: true, depthTest: false, depthWrite: false }));
+      impactMarker.position.copy(toWorld(landing, 0.07));
+      impactMarker.renderOrder = 7;
+      preview.add(impactMarker);
+    }
   }
 
   // Portals.
@@ -696,6 +744,8 @@ export function createWorld({ canvas, overlay, cols, rows }) {
       place(f.el, f.pos.clone().setY(f.pos.y + k * 0.6));
       f.el.style.opacity = String(k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3);
     }
+    for (const u of previewUniforms) u.uTime.value = t;
+    if (impactMarker) impactMarker.scale.setScalar(0.92 + Math.sin(t * 5) * 0.08);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }

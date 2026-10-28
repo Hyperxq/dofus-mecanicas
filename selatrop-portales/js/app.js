@@ -225,7 +225,7 @@ function portalCells() {
 function refresh() {
   if (busy) { world.setHighlights({}); world.setPreview(null); world.setHover(null); return; }
   const hl = {};
-  let segs = null;
+  let segs = null, impact = {};
   const t = tool && TOOLS[tool];
   if (editTool) {
     // Map editing shows only the hovered cell.
@@ -247,7 +247,7 @@ function refresh() {
       const isPortal = !!R.portalAt(S.portals, hoverCell);
       if (!isPortal || previewAllowed()) {
         const res = R.castSpell(S, spell, hoverCell);
-        if (res.segments) segs = res.segments;
+        if (res.segments) { segs = res.segments; impact = { landing: res.landing, ok: res.ok }; }
         if (res.ok) hl.zone = res.zone;
       }
     }
@@ -255,7 +255,7 @@ function refresh() {
     hl.range = S.portals.map((p) => ({ x: p.x, y: p.y }));
   }
   world.setHighlights(hl);
-  world.setPreview(segs);
+  world.setPreview(segs, impact);
   world.setHover(hoverCell);
   renderNetwork();
 }
@@ -417,36 +417,43 @@ function updateInsets() {
 // Input
 const canvas = $("world");
 let down = null;
-const pointers = new Map();
-let pinch = null;
-const spread = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+// Pinch uses touch events: iOS Safari does not deliver reliable multi-pointer events for gestures.
+// Pointer events fire before their touch counterparts, so `gesture` stays set through the last pointerup.
+let gesture = false, pinchDist = 0;
+const touchSpread = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+canvas.addEventListener("touchstart", (ev) => {
+  if (ev.touches.length < 2) return;
+  ev.preventDefault();
+  gesture = true;
+  down = null;
+  pinchDist = touchSpread(ev.touches);
+}, { passive: false });
+canvas.addEventListener("touchmove", (ev) => {
+  if (ev.touches.length < 2) return;
+  ev.preventDefault();
+  const d = touchSpread(ev.touches);
+  if (pinchDist > 0 && d > 0) world.zoomBy(d / pinchDist);
+  pinchDist = d;
+}, { passive: false });
+const endTouch = (ev) => {
+  pinchDist = 0;
+  if (!ev.touches.length) gesture = false;
+};
+canvas.addEventListener("touchend", endTouch);
+canvas.addEventListener("touchcancel", endTouch);
+document.addEventListener("gesturestart", (ev) => ev.preventDefault());
+
 canvas.addEventListener("pointermove", (ev) => {
-  if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-  if (pinch && pointers.size === 2) {
-    const d = spread();
-    if (d > 0 && pinch > 0) world.zoomBy(d / pinch);
-    pinch = d;
-    return;
-  }
   if (ev.pointerType === "touch") return;
   const c = world.pickCell(ev.clientX, ev.clientY);
   if (!R.same(c, hoverCell) && (c || hoverCell)) { hoverCell = c; refresh(); }
 });
 canvas.addEventListener("pointerleave", () => { hoverCell = null; refresh(); });
 canvas.addEventListener("pointerdown", (ev) => {
-  pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-  if (pointers.size === 2) { pinch = spread(); down = null; return; }
-  if (!pinch) down = { x: ev.clientX, y: ev.clientY };
+  if (!gesture) down = { x: ev.clientX, y: ev.clientY };
 });
-const release = (ev) => {
-  pointers.delete(ev.pointerId);
-  if (!pointers.size) pinch = null;
-};
-canvas.addEventListener("pointercancel", release);
 canvas.addEventListener("pointerup", (ev) => {
-  const pinching = !!pinch;
-  release(ev);
-  if (pinching || !down || ev.button === 2 || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 8) { down = null; return; }
+  if (gesture || !down || ev.button === 2 || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 8) { down = null; return; }
   down = null;
   const c = world.pickCell(ev.clientX, ev.clientY);
   if (ev.pointerType === "touch" && tool && TOOLS[tool].kind === "spell" && !R.same(lastTap, c)) {
