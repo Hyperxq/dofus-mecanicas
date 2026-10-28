@@ -38,9 +38,25 @@
         <div id="quiz-options" class="quiz-options"></div>
         <p id="quiz-feedback" class="quiz-feedback" aria-live="polite"></p>
       </div>
-      <h2 class="eyebrow">Objetivos</h2>
+      <h2 id="objectives-title" class="eyebrow">Objetivos</h2>
       <ul id="objectives" class="objectives"></ul>
       <p id="move-hint" class="hint">Sin hechizo elegido, tocá una casilla verde para moverte (6 PM).</p>
+      <div id="editor" class="editor" hidden>
+        <h2 class="eyebrow">Editar mapa</h2>
+        <div class="edit-tools" role="group" aria-label="Herramientas de edición">
+          <button type="button" class="chip" data-edit="portal" aria-pressed="false">Portal</button>
+          <button type="button" class="chip" data-edit="dummy" aria-pressed="false">Enemigo</button>
+          <button type="button" class="chip" data-edit="rock" aria-pressed="false">Roca</button>
+          <button type="button" class="chip" data-edit="caster" aria-pressed="false">Mover Selatrop</button>
+          <button type="button" class="chip" data-edit="erase" aria-pressed="false">Borrar</button>
+        </div>
+        <p id="edit-hint" class="hint">Elegí una herramienta y tocá casillas del mapa, sin límite de alcance. Portal, Enemigo y Roca se quitan tocándolos de nuevo. Zoom: rueda del mouse o pellizcá con dos dedos.</p>
+        <label class="toggle" for="free-range"><input type="checkbox" id="free-range"> Alcance ilimitado para portales y hechizos</label>
+        <div class="edit-actions">
+          <button type="button" id="pg-clear" class="btn ghost">Vaciar mapa</button>
+          <button type="button" id="pg-sample" class="btn ghost">Mapa de ejemplo</button>
+        </div>
+      </div>
     </div>
     <div class="panel-foot">
       <button type="button" id="prev" class="btn">Anterior</button>

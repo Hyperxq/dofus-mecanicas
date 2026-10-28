@@ -1,9 +1,11 @@
 import { createWorld } from "./scene.js";
 import { LESSONS } from "./lessons.js";
 import * as R from "./rules.js";
+import { applyEdit } from "./editor.js";
 
-const COLS = 15, ROWS = 15, PM = 6, PORTAL_RANGE = [1, 6];
+const COLS = 15, ROWS = 15, PM = 6, PORTAL_RANGE = [1, 6], FREE_RANGE = 99;
 const STORE_KEY = "dofus-mecanicas:selatrop:done";
+const PLAY_KEY = "dofus-mecanicas:selatrop:playground";
 
 const ICONS = {
   portal: '<circle cx="16" cy="16" r="10"/><path d="M16 6a10 10 0 0 1 0 20M16 11a5 5 0 0 1 0 10"/>',
@@ -41,30 +43,55 @@ const $ = (id) => document.getElementById(id);
 const world = createWorld({ canvas: $("world"), overlay: $("overlay"), cols: COLS, rows: ROWS });
 
 let lessonIndex = 0, lesson, S, progress = [], quiz = null, tool = null, busy = false, hoverCell = null, lastTap = null;
+let editTool = null, freeRange = false;
 let done = new Set();
 try { done = new Set(JSON.parse(localStorage.getItem(STORE_KEY) || "[]")); } catch { /* storage unavailable */ }
 
 const nameOf = (id) => S.entities.find((e) => e.id === id)?.name || id;
 const previewAllowed = () => !!lesson.preview && (!lesson.quiz || quiz.answered !== null);
 const occupied = (c) => R.same(S.caster, c) || S.entities.some((e) => R.same(e, c));
+const spellFor = (spell) => (lesson.playground && freeRange ? { ...spell, range: [1, FREE_RANGE] } : spell);
 
-function loadLesson(i) {
-  lessonIndex = Math.max(0, Math.min(LESSONS.length - 1, i));
-  lesson = LESSONS[lessonIndex];
-  const d = lesson.setup();
-  S = {
+function boardFrom(d) {
+  return {
     cols: COLS, rows: ROWS,
     blocked: new Set(d.blocked.map(([x, y]) => `${x},${y}`)),
     portals: d.portals.map((p) => ({ ...p })),
     caster: { ...d.caster },
     entities: d.entities.map((e) => ({ ...e })),
   };
-  progress = lesson.objectives.map(() => false);
-  quiz = lesson.quiz ? { answered: null } : null;
-  tool = null;
+}
+
+function loadPlayground() {
+  try {
+    const d = JSON.parse(localStorage.getItem(PLAY_KEY) || "null");
+    if (d && d.caster && Array.isArray(d.blocked)) return boardFrom(d);
+  } catch { /* storage unavailable or corrupt */ }
+  return null;
+}
+
+function savePlayground() {
+  if (!lesson.playground) return;
+  const d = { blocked: [...S.blocked].map((k) => k.split(",").map(Number)), portals: S.portals, caster: S.caster, entities: S.entities };
+  try { localStorage.setItem(PLAY_KEY, JSON.stringify(d)); } catch { /* storage unavailable */ }
+}
+
+function syncWorld() {
   world.setBlocked(S.blocked);
   world.setPortals(S.portals);
   world.setActors(S.caster, S.entities);
+}
+
+function loadLesson(i, { fresh = false } = {}) {
+  lessonIndex = Math.max(0, Math.min(LESSONS.length - 1, i));
+  lesson = LESSONS[lessonIndex];
+  S = (lesson.playground && !fresh && loadPlayground()) || boardFrom(lesson.setup());
+  progress = lesson.objectives.map(() => false);
+  quiz = lesson.quiz ? { answered: null } : null;
+  tool = null;
+  editTool = null;
+  syncWorld();
+  renderEditor();
   $("result").textContent = "Todavía no lanzaste nada en esta lección.";
   try { history.replaceState(null, "", `#leccion-${lessonIndex + 1}`); } catch { /* sandboxed */ }
   renderPanel();
@@ -103,6 +130,7 @@ function renderObjectives() {
     return li;
   }));
   ul.hidden = !lesson.objectives.length;
+  $("objectives-title").hidden = ul.hidden;
   const complete = lesson.objectives.length > 0 && progress.every(Boolean);
   $("panel").classList.toggle("complete", complete);
   $("next").classList.toggle("pulse", complete && lessonIndex < LESSONS.length - 1);
@@ -165,16 +193,31 @@ function pickTool(id) {
 
 function setTool(id) {
   tool = id;
+  if (id) setEditTool(null, { silent: true });
   document.querySelectorAll(".slot").forEach((b, i) => b.setAttribute("aria-pressed", String(ORDER[i] === id)));
   refresh();
 }
 
+function setEditTool(id, { silent = false } = {}) {
+  editTool = id;
+  document.querySelectorAll("[data-edit]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.edit === id)));
+  if (id && tool) setTool(null);
+  else if (!silent) refresh();
+}
+
+function renderEditor() {
+  $("editor").hidden = !lesson.playground;
+  $("free-range").checked = freeRange;
+  document.querySelectorAll("[data-edit]").forEach((b) => b.setAttribute("aria-pressed", "false"));
+}
+
 function portalCells() {
+  const max = lesson.playground && freeRange ? FREE_RANGE : PORTAL_RANGE[1];
   const out = [];
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
     const c = { x, y };
     const d = R.dist(S.caster, c);
-    if (d >= PORTAL_RANGE[0] && d <= PORTAL_RANGE[1] && !S.blocked.has(R.key(c)) && !occupied(c) && !R.portalAt(S.portals, c)) out.push(c);
+    if (d >= PORTAL_RANGE[0] && d <= max && !S.blocked.has(R.key(c)) && !occupied(c) && !R.portalAt(S.portals, c)) out.push(c);
   }
   return out;
 }
@@ -184,7 +227,9 @@ function refresh() {
   const hl = {};
   let segs = null;
   const t = tool && TOOLS[tool];
-  if (!t) {
+  if (editTool) {
+    // Map editing shows only the hovered cell.
+  } else if (!t) {
     if (lesson.move) {
       const reach = R.reachable(S, PM);
       hl.move = [...reach.values()].map((r) => r.cell);
@@ -194,13 +239,14 @@ function refresh() {
   } else if (t.kind === "portal") {
     hl.range = portalCells();
   } else if (t.kind === "spell") {
-    const cells = R.rangeCells(S, t.spell);
+    const spell = spellFor(t.spell);
+    const cells = R.rangeCells(S, spell);
     hl.range = cells.filter((c) => c.los);
     hl.rangeNoLos = cells.filter((c) => !c.los);
-    if (hoverCell && R.inRange(S, t.spell, hoverCell)) {
+    if (hoverCell && R.inRange(S, spell, hoverCell)) {
       const isPortal = !!R.portalAt(S.portals, hoverCell);
       if (!isPortal || previewAllowed()) {
-        const res = R.castSpell(S, t.spell, hoverCell);
+        const res = R.castSpell(S, spell, hoverCell);
         if (res.segments) segs = res.segments;
         if (res.ok) hl.zone = res.zone;
       }
@@ -242,6 +288,16 @@ function describe(spell, res) {
 
 async function onCell(cell) {
   if (busy || !cell) return;
+  if (editTool) {
+    const { state, changed, message, removed } = applyEdit(S, editTool, cell);
+    if (!changed) return toast(message);
+    if (removed) toast(`Se cerró ${removed.id}, el portal más viejo.`);
+    S = state;
+    syncWorld();
+    savePlayground();
+    refresh();
+    return;
+  }
   const t = tool && TOOLS[tool];
   if (!t) {
     if (!lesson.move) return;
@@ -269,8 +325,9 @@ async function onCell(cell) {
     return;
   }
   if (t.kind === "spell") {
-    if (!R.inRange(S, t.spell, cell)) return setTool(null);
-    const res = R.castSpell(S, t.spell, cell);
+    const spell = spellFor(t.spell);
+    if (!R.inRange(S, spell, cell)) return setTool(null);
+    const res = R.castSpell(S, spell, cell);
     if (!res.ok && !res.segments) {
       toast(REASONS[res.reason]);
       emit({ type: "cast", spell: t.spell.id, result: res });
@@ -322,6 +379,7 @@ function interrupt() {
 }
 
 function emit(ev) {
+  if (ev.type !== "enter") savePlayground();
   let changed = false;
   lesson.objectives.forEach((o, i) => {
     if (!progress[i] && o.done(ev, S)) { progress[i] = true; changed = true; }
@@ -359,15 +417,36 @@ function updateInsets() {
 // Input
 const canvas = $("world");
 let down = null;
+const pointers = new Map();
+let pinch = null;
+const spread = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 canvas.addEventListener("pointermove", (ev) => {
+  if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (pinch && pointers.size === 2) {
+    const d = spread();
+    if (d > 0 && pinch > 0) world.zoomBy(d / pinch);
+    pinch = d;
+    return;
+  }
   if (ev.pointerType === "touch") return;
   const c = world.pickCell(ev.clientX, ev.clientY);
   if (!R.same(c, hoverCell) && (c || hoverCell)) { hoverCell = c; refresh(); }
 });
 canvas.addEventListener("pointerleave", () => { hoverCell = null; refresh(); });
-canvas.addEventListener("pointerdown", (ev) => { down = { x: ev.clientX, y: ev.clientY }; });
+canvas.addEventListener("pointerdown", (ev) => {
+  pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (pointers.size === 2) { pinch = spread(); down = null; return; }
+  if (!pinch) down = { x: ev.clientX, y: ev.clientY };
+});
+const release = (ev) => {
+  pointers.delete(ev.pointerId);
+  if (!pointers.size) pinch = null;
+};
+canvas.addEventListener("pointercancel", release);
 canvas.addEventListener("pointerup", (ev) => {
-  if (!down || ev.button === 2 || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 8) { down = null; return; }
+  const pinching = !!pinch;
+  release(ev);
+  if (pinching || !down || ev.button === 2 || Math.hypot(ev.clientX - down.x, ev.clientY - down.y) > 8) { down = null; return; }
   down = null;
   const c = world.pickCell(ev.clientX, ev.clientY);
   if (ev.pointerType === "touch" && tool && TOOLS[tool].kind === "spell" && !R.same(lastTap, c)) {
@@ -384,14 +463,27 @@ canvas.addEventListener("contextmenu", (ev) => { ev.preventDefault(); setTool(nu
 canvas.addEventListener("wheel", (ev) => { ev.preventDefault(); world.zoomBy(ev.deltaY < 0 ? 1.1 : 1 / 1.1); }, { passive: false });
 window.addEventListener("keydown", (ev) => {
   if (ev.target instanceof HTMLSelectElement) return;
-  if (ev.key === "Escape") return setTool(null);
+  if (ev.key === "Escape") { setEditTool(null); return setTool(null); }
   const id = ORDER.find((k) => TOOLS[k].key === ev.key);
   if (id) pickTool(id);
 });
 
 $("prev").addEventListener("click", () => loadLesson(lessonIndex - 1));
 $("next").addEventListener("click", () => loadLesson(lessonIndex + 1));
-$("reset").addEventListener("click", () => loadLesson(lessonIndex));
+$("reset").addEventListener("click", () => loadLesson(lessonIndex, { fresh: true }));
+document.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
+  if (busy) return;
+  setEditTool(editTool === b.dataset.edit ? null : b.dataset.edit);
+}));
+$("free-range").addEventListener("change", (ev) => { freeRange = ev.target.checked; refresh(); });
+$("pg-clear").addEventListener("click", () => {
+  if (busy) return;
+  S = boardFrom({ caster: S.caster, portals: [], entities: [], blocked: [] });
+  syncWorld();
+  savePlayground();
+  refresh();
+});
+$("pg-sample").addEventListener("click", () => { if (!busy) { loadLesson(lessonIndex, { fresh: true }); savePlayground(); } });
 $("lesson-select").addEventListener("change", (ev) => loadLesson(Number(ev.target.value)));
 $("zoom-in").addEventListener("click", () => world.zoomBy(1.15));
 $("zoom-out").addEventListener("click", () => world.zoomBy(1 / 1.15));

@@ -3,6 +3,7 @@
 // { type: "move" }, { type: "neutral" }, { type: "interrupt" }, { type: "quiz", correct }, { type: "enter" }.
 
 const dummy = (n, x, y) => ({ id: `m${n}`, name: `Muñeco ${n}`, x, y });
+const enemy = (n, x, y) => ({ ...dummy(n, x, y), name: `Enemigo ${n}` });
 const portals = (...list) => list.map(([id, x, y]) => ({ id, x, y }));
 const cast = (spell, test = () => true) => (ev) => ev.type === "cast" && ev.result.ok && (!spell || ev.spell === spell) && test(ev.result);
 const hit = (id) => (r) => r.hits.includes(id);
@@ -196,16 +197,17 @@ export const LESSONS = [
     objectives: [{ text: "Leé la lección", done: (ev) => ev.type === "enter" }],
   },
   {
-    title: "Laboratorio libre",
-    body: `<p>Todas las herramientas habilitadas. Armá redes, probá empujes, áreas y atracciones, y fijate qué pasa con cada muñeco.</p>
-      <p>Atajos: <kbd>1</kbd>–<kbd>8</kbd> eligen hechizo, <kbd>Esc</kbd> o clic derecho lo cancela, y la rueda del mouse hace zoom.</p>`,
+    title: "Playground",
+    body: `<p>Tu mapa, tus reglas. Armá el escenario con las herramientas de <b>Editar mapa</b> y probá redes, áreas, empujes y atracciones.</p>
+      <p>Atajos: <kbd>1</kbd>–<kbd>8</kbd> eligen hechizo, <kbd>Esc</kbd> o clic derecho cancela, y la rueda del mouse hace zoom. Tu escenario se guarda en este navegador.</p>`,
     tools: ["portal", "golpe", "cruz", "insulto", "convulsion", "shock", "neutral", "interrupcion"],
     move: true,
     preview: true,
+    playground: true,
     setup: () => ({
       caster: { x: 2, y: 7 },
       portals: [],
-      entities: [dummy(1, 10, 4), dummy(2, 11, 5), dummy(3, 12, 10), dummy(4, 8, 11)],
+      entities: [enemy(1, 10, 4), enemy(2, 11, 5), enemy(3, 12, 10), enemy(4, 8, 11)],
       blocked: [[6, 3], [6, 4], [9, 8], [10, 8], [4, 11]],
     }),
     objectives: [],

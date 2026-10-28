@@ -258,3 +258,16 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
 }
 
 [hidden] { display: none !important; }
+
+.editor { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(138, 113, 64, 0.5); }
+.edit-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font: inherit; font-size: 0.88rem; font-weight: 600; color: var(--ink); cursor: pointer;
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--trim); background: rgba(0, 0, 0, 0.3);
+}
+.chip:hover { border-color: var(--trim-hi); }
+.chip[aria-pressed="true"] { border-color: var(--orange); background: rgba(240, 144, 42, 0.2); color: #ffd9a8; }
+.toggle { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; color: #e2d8c2; cursor: pointer; }
+.toggle input { accent-color: var(--wakfu); width: 16px; height: 16px; }
+.edit-actions { display: flex; gap: 8px; }
+.edit-actions .btn { flex: 1; font-size: 0.85rem; }
