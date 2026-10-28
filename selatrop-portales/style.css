@@ -310,3 +310,12 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
 .toggle input { accent-color: var(--wakfu); width: 16px; height: 16px; }
 .edit-actions { display: flex; gap: 8px; }
 .edit-actions .btn { flex: 1; font-size: 0.85rem; }
+
+/* Taps on the map and HUD must not start text selection, the iOS callout or the tap flash. */
+html, body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.lesson-body, .lesson-body * { -webkit-user-select: text; user-select: text; }
