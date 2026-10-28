@@ -467,8 +467,17 @@ export function createWorld({ canvas, overlay, cols, rows }) {
 
   // Entities: the caster token and training dummies.
   const actors = new Map();
-  const casterMat = new THREE.MeshStandardMaterial({ color: "#eef7f6", roughness: 0.6 });
-  const crystalMat = new THREE.MeshStandardMaterial({ color: "#46d8e4", emissive: "#1aa6b2", emissiveIntensity: 0.8, roughness: 0.3, flatShading: true });
+  const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.7, ...extra });
+  const creature = {
+    body: std("#e4e8ea"),
+    hood: std("#1f7f98"),
+    trim: std("#e3d3a8"),
+    tuft: std("#d6ccad", { flatShading: true }),
+    feet: std("#e5832a"),
+    eyeRing: new THREE.MeshBasicMaterial({ color: "#1a1a1a" }),
+    iris: new THREE.MeshBasicMaterial({ color: "#e6d29c" }),
+    pupil: new THREE.MeshBasicMaterial({ color: "#2fc4e8" }),
+  };
   const burlap = new THREE.MeshStandardMaterial({ color: "#c9a46a", roughness: 1, flatShading: true });
   const post = new THREE.MeshStandardMaterial({ color: "#6b4a2b", roughness: 1 });
 
@@ -482,17 +491,52 @@ export function createWorld({ canvas, overlay, cols, rows }) {
     return ring;
   }
 
+  // Creature-mode Selatrop: round pale body, big ringed eyes, teal hood with a cream band, orange feet.
   function makeCaster() {
     const g = new THREE.Group();
     g.add(teamRing("#3d8cff"));
-    const body = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.62, 7), casterMat);
-    body.position.y = 0.31;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), casterMat);
-    head.position.y = 0.7;
-    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.1, 0), crystalMat);
-    crystal.position.y = 1.0;
-    crystal.name = "crystal";
-    for (const m of [body, head, crystal]) { m.castShadow = true; g.add(m); }
+    const c = new THREE.Group();
+    c.name = "creature";
+    c.rotation.y = Math.PI / 4;
+    const add = (geo, mat, [x, y, z], rot = [0, 0, 0], scale = [1, 1, 1]) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      m.rotation.set(...rot);
+      m.scale.set(...scale);
+      m.castShadow = true;
+      c.add(m);
+      return m;
+    };
+    add(new THREE.SphereGeometry(0.27, 24, 18), creature.body, [0, 0.26, 0], [0, 0, 0], [1, 0.9, 0.95]);
+    for (const s of [-1, 1]) {
+      const eye = new THREE.Group();
+      eye.position.set(s * 0.108, 0.22, 0.232);
+      eye.rotation.y = s * 0.28;
+      const disc = (r, mat, z, sy = 1, dx = 0) => {
+        const m = new THREE.Mesh(new THREE.CircleGeometry(r, 24), mat);
+        m.position.set(dx, 0, z);
+        m.scale.y = sy;
+        eye.add(m);
+      };
+      disc(0.1, creature.eyeRing, 0, 1.1);
+      disc(0.08, creature.iris, 0.002, 1.1);
+      disc(0.052, creature.pupil, 0.006, 1.5, -s * 0.01);
+      c.add(eye);
+    }
+    const capGeo = new THREE.SphereGeometry(0.28, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.45);
+    add(capGeo, creature.hood, [0, 0.36, -0.03], [-0.32, 0, 0], [1.02, 0.95, 1.06]);
+    add(new THREE.TorusGeometry(0.255, 0.036, 10, 36), creature.trim, [0, 0.385, -0.01], [Math.PI / 2 - 0.32, 0, 0]);
+    add(new THREE.TorusGeometry(0.065, 0.013, 6, 20, Math.PI * 1.7), creature.trim, [0, 0.56, 0.1], [-0.95, 0, 0.4]);
+    for (const s of [-1, 1]) {
+      add(new THREE.ConeGeometry(0.075, 0.2, 8), creature.hood, [s * 0.19, 0.56, -0.05], [0, 0, -s * 0.7]);
+      add(new THREE.ConeGeometry(0.032, 0.07, 6), creature.trim, [s * 0.255, 0.64, -0.05], [0, 0, -s * 0.7]);
+    }
+    add(new THREE.ConeGeometry(0.09, 0.24, 8), creature.hood, [0, 0.44, -0.27], [-1.95, 0, 0]);
+    for (const [x, y, z, r] of [[0.17, 0.27, -0.16, 0.7], [0.2, 0.2, -0.1, 1.1], [0.12, 0.33, -0.2, 0.4]]) {
+      add(new THREE.ConeGeometry(0.045, 0.14, 5), creature.tuft, [x, y, z], [-0.6, 0, -r]);
+    }
+    for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.075, 14, 10), creature.feet, [s * 0.11, 0.04, 0.12], [0, 0, 0], [1, 0.55, 1.3]);
+    g.add(c);
     return g;
   }
 
@@ -797,9 +841,10 @@ export function createWorld({ canvas, overlay, cols, rows }) {
     }
     for (const [id, a] of actors) {
       if (id === "caster") {
-        const c = a.group.getObjectByName("crystal");
-        c.rotation.y = t * 1.6;
-        c.position.y = 1.0 + Math.sin(t * 2.2) * 0.05;
+        const c = a.group.getObjectByName("creature");
+        const bob = Math.sin(t * 3.2);
+        c.position.y = Math.max(0, bob) * 0.025;
+        c.scale.set(1 + bob * 0.015, 1 - bob * 0.02, 1 + bob * 0.015);
       } else if (a.label) place(a.label, a.group.position.clone().setY(1.12));
     }
     for (let i = floats.length - 1; i >= 0; i--) {
