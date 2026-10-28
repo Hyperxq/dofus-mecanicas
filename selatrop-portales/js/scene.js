@@ -1,9 +1,8 @@
 import * as THREE from "three";
 
-const TEAL = new THREE.Color("#46d8e4");
 const COLORS = {
-  range: "#2f7fe0",
-  rangeNoLos: "#a9c8ee",
+  range: "#3a3fb8",
+  rangeNoLos: "#9298dc",
   move: "#7dff8a",
   path: "#8ef08f",
   zone: "#ea4a2c",
@@ -88,31 +87,33 @@ const PORTAL_VERT = `
 varying vec2 vUv;
 void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 
+// Flat turquoise disc filling the cell, pale centre and bright rim, like the in-game Eliotrope portal.
 const PORTAL_FRAG = `
-uniform float uTime; uniform float uOpen; uniform float uFlash; uniform vec3 uColor;
+uniform float uTime; uniform float uOpen; uniform float uFlash;
 varying vec2 vUv;
 void main() {
   vec2 p = vUv * 2.0 - 1.0;
   float r = length(p);
   if (r > 1.0) discard;
   float a = atan(p.y, p.x);
-  float rim = smoothstep(0.66, 0.84, r) * (1.0 - smoothstep(0.9, 1.0, r));
-  float swirl = 0.5 + 0.5 * sin(a * 5.0 + r * 12.0 - uTime * 3.2);
-  float core = 1.0 - smoothstep(0.0, 0.84, r);
-  float arms = smoothstep(0.5, 1.0, 0.5 + 0.5 * sin(a * 3.0 - r * 10.0 + uTime * 2.4)) * core;
-  float alpha = (rim * (0.7 + 0.3 * swirl) + arms * 0.55 + core * 0.2) * uOpen + uFlash * core;
-  vec3 col = mix(uColor, vec3(0.92, 1.0, 1.0), clamp(rim * swirl * 0.6 + arms * 0.3 + uFlash, 0.0, 1.0));
-  gl_FragColor = vec4(col * alpha, alpha);
+  float body = 1.0 - smoothstep(0.86, 1.0, r);
+  float rim = smoothstep(0.7, 0.88, r) * (1.0 - smoothstep(0.92, 1.0, r));
+  float swirl = 0.5 + 0.5 * sin(a * 3.0 - r * 8.0 + uTime * 1.7);
+  vec3 inner = vec3(0.80, 0.99, 0.97);
+  vec3 outer = vec3(0.30, 0.84, 0.90);
+  vec3 col = mix(inner, outer, smoothstep(0.1, 0.9, r));
+  col = mix(col, vec3(1.0), rim * 0.55 + swirl * 0.14 * body + uFlash * 0.6);
+  float alpha = (body * (0.72 + 0.1 * swirl) + rim * 0.25) * uOpen;
+  gl_FragColor = vec4(col, alpha);
 }`;
 
-const COLUMN_FRAG = `
-uniform float uOpen; uniform float uTime; uniform vec3 uColor;
+const HALO_FRAG = `
+uniform float uOpen; uniform float uFlash;
 varying vec2 vUv;
 void main() {
-  float fade = pow(1.0 - vUv.y, 2.2);
-  float bands = 0.75 + 0.25 * sin(vUv.x * 40.0 + uTime * 2.0 + vUv.y * 6.0);
-  float alpha = fade * 0.32 * uOpen * bands;
-  gl_FragColor = vec4(uColor * alpha, alpha);
+  float r = length(vUv * 2.0 - 1.0);
+  float alpha = (1.0 - smoothstep(0.55, 1.0, r)) * (0.35 + uFlash) * uOpen;
+  gl_FragColor = vec4(vec3(0.35, 0.9, 0.95) * alpha, alpha);
 }`;
 
 const RIBBON_FRAG = `
@@ -276,7 +277,7 @@ export function createWorld({ canvas, overlay, cols, rows }) {
   const layers = {
     move: layer(COLORS.move, 0.42, 0.016),
     path: layer(COLORS.path, 0.55, 0.018),
-    range: layer(COLORS.range, 0.45, 0.016),
+    range: layer(COLORS.range, 0.6, 0.016),
     rangeNoLos: layer(COLORS.rangeNoLos, 0.3, 0.016),
     zone: layer(COLORS.zone, 0.55, 0.02),
     flash: layer("#fff1b8", 0, 0.024),
@@ -382,29 +383,29 @@ export function createWorld({ canvas, overlay, cols, rows }) {
   function makePortal(p) {
     const group = new THREE.Group();
     group.position.copy(toWorld(p));
-    const uniforms = { uTime: { value: 0 }, uOpen: { value: 0 }, uFlash: { value: 0 }, uColor: { value: TEAL } };
+    const uniforms = { uTime: { value: 0 }, uOpen: { value: 0 }, uFlash: { value: 0 } };
+    const halo = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.35, 1.35).rotateX(-Math.PI / 2),
+      new THREE.ShaderMaterial({ uniforms, vertexShader: PORTAL_VERT, fragmentShader: HALO_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+    );
+    halo.position.y = 0.03;
+    halo.renderOrder = 4;
     const disk = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.08, 1.08).rotateX(-Math.PI / 2),
-      new THREE.ShaderMaterial({ uniforms, vertexShader: PORTAL_VERT, fragmentShader: PORTAL_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+      new THREE.PlaneGeometry(0.9, 0.9).rotateX(-Math.PI / 2),
+      new THREE.ShaderMaterial({ uniforms, vertexShader: PORTAL_VERT, fragmentShader: PORTAL_FRAG, transparent: true, depthWrite: false }),
     );
     disk.position.y = 0.035;
-    disk.renderOrder = 4;
-    group.add(disk);
-    const column = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.4, 0.46, 0.95, 32, 1, true),
-      new THREE.ShaderMaterial({ uniforms, vertexShader: PORTAL_VERT, fragmentShader: COLUMN_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
-    );
-    column.position.y = 0.48;
-    group.add(column);
+    disk.renderOrder = 5;
+    group.add(halo, disk);
 
-    const N = 18;
-    const seeds = Array.from({ length: N }, (_, i) => ({ phase: i / N, ang: Math.random() * Math.PI * 2, rad: 0.15 + Math.random() * 0.25 }));
+    const N = 8;
+    const seeds = Array.from({ length: N }, (_, i) => ({ phase: i / N, ang: Math.random() * Math.PI * 2, rad: 0.12 + Math.random() * 0.26 }));
     const pgeo = new THREE.BufferGeometry();
     pgeo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(N * 3), 3));
-    const points = new THREE.Points(pgeo, new THREE.PointsMaterial({ map: glow, size: 7, sizeAttenuation: false, color: 0x9ff6ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    const points = new THREE.Points(pgeo, new THREE.PointsMaterial({ map: glow, size: 4, sizeAttenuation: false, color: 0xd8ffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     group.add(points);
 
-    const light = new THREE.PointLight(0x46d8e4, 0, 3.2, 1.6);
+    const light = new THREE.PointLight(0x46d8e4, 0, 2.4, 1.6);
     light.position.y = 0.45;
     group.add(light);
 
@@ -415,7 +416,7 @@ export function createWorld({ canvas, overlay, cols, rows }) {
     scene.add(group);
     const rec = { id: p.id, cell: { x: p.x, y: p.y }, group, uniforms, points, seeds, light, label, closing: false };
     portals.set(p.id, rec);
-    tween(450, (k) => { uniforms.uOpen.value = k; light.intensity = 3 * k; group.scale.setScalar(0.4 + 0.6 * easeOut(k)); });
+    tween(450, (k) => { uniforms.uOpen.value = k; light.intensity = 1.4 * k; group.scale.setScalar(0.4 + 0.6 * easeOut(k)); });
     return rec;
   }
 
@@ -425,7 +426,7 @@ export function createWorld({ canvas, overlay, cols, rows }) {
     rec.label.remove();
     return tween(380, (k) => {
       rec.uniforms.uOpen.value = 1 - k;
-      rec.light.intensity = 3 * (1 - k);
+      rec.light.intensity = 1.4 * (1 - k);
       rec.group.scale.setScalar(1 - 0.6 * k);
     }).then(() => scene.remove(rec.group));
   }
@@ -751,12 +752,12 @@ export function createWorld({ canvas, overlay, cols, rows }) {
         const life = (t * 0.32 + s.phase) % 1;
         const ang = s.ang + t * 0.8;
         arr[i * 3] = Math.cos(ang) * s.rad;
-        arr[i * 3 + 1] = 0.05 + life * 1.05;
+        arr[i * 3 + 1] = 0.04 + life * 0.4;
         arr[i * 3 + 2] = Math.sin(ang) * s.rad;
       });
       rec.points.geometry.attributes.position.needsUpdate = true;
       rec.points.material.opacity = rec.uniforms.uOpen.value;
-      place(rec.label, rec.group.position.clone().setY(1.15));
+      place(rec.label, rec.group.position.clone().setY(0.55));
     }
     for (const [id, a] of actors) {
       if (id === "caster") {

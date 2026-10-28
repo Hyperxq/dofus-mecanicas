@@ -252,7 +252,7 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
   font-weight: 700; font-size: 15px; color: #eaffff;
   text-shadow: 0 0 6px rgba(70, 216, 228, 0.9), 0 1px 2px #000;
 }
-.portal-label i { font-style: normal; font-size: 10px; color: var(--trim-hi); text-shadow: 0 1px 2px #000; }
+.portal-label i { font-style: normal; font-size: 13px; font-weight: 800; color: #ff4b36; text-shadow: 0 0 2px #fff, 0 0 3px #fff, 0 1px 2px #000; }
 .actor-label {
   font-size: 11px; font-weight: 600; color: var(--ink);
   padding: 1px 6px; border-radius: 4px; background: rgba(90, 24, 16, 0.75); border: 1px solid rgba(239, 106, 79, 0.7);
