@@ -17,8 +17,8 @@ export const SPELLS = {
     blurb: "Línea perpendicular de 3 casillas. Empuja 2 en la dirección del lanzamiento." },
   convulsion: { id: "convulsion", name: "Convulsión", range: [1, 4], zone: "x", effect: { type: "burst", cells: 1 },
     blurb: "Zona en X. El centro empuja hacia adelante y las esquinas en diagonal." },
-  shock: { id: "shock", name: "Shock", range: [1, 6], zone: "cross", effect: { type: "pull", cells: 1 },
-    blurb: "Zona en cruz. Atrae hacia el centro del impacto." },
+  shock: { id: "shock", name: "Shock", range: [1, 6], zone: "circle2", effect: { type: "pull", cells: 1 },
+    blurb: "Círculo de radio 2. Atrae una casilla hacia el centro del impacto." },
 };
 
 export function addPortal(portals, cell) {
@@ -96,6 +96,7 @@ export function zoneCells(zone, center, dir) {
     cross: [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]],
     x: [[0, 0], [1, 1], [-1, -1], [1, -1], [-1, 1]],
     perp3: [[0, 0], [-d.y, d.x], [d.y, -d.x]],
+    circle2: [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2], [1, 1], [1, -1], [-1, 1], [-1, -1]],
   }[zone];
   return offsets.map(([ox, oy]) => ({ x: center.x + ox, y: center.y + oy }));
 }
@@ -200,6 +201,30 @@ function slide(state, occupied, from, dir, cells, stopAt) {
     path.push(pos);
   }
   return { from: { x: from.x, y: from.y }, path, to: pos, collided, teleported };
+}
+
+// Breadth-first movement from the caster. Portal cells can be reached but never walked past.
+export function reachable(state, pm) {
+  const occupied = new Set(state.entities.map(key));
+  const out = new Map();
+  const seen = new Set([key(state.caster)]);
+  let frontier = [{ cell: state.caster, path: [] }];
+  for (let step = 0; step < pm; step++) {
+    const next = [];
+    for (const { cell, path } of frontier) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const c = { x: cell.x + dx, y: cell.y + dy };
+        const k = key(c);
+        if (seen.has(k) || !inside(state, c) || state.blocked.has(k) || occupied.has(k)) continue;
+        seen.add(k);
+        const entry = { cell: c, path: [...path, c] };
+        out.set(k, entry);
+        if (!portalAt(state.portals, c)) next.push(entry);
+      }
+    }
+    frontier = next;
+  }
+  return out;
 }
 
 export function walkThrough(portals, entryId) {

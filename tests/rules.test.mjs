@@ -7,6 +7,7 @@ import {
   hasLineOfSight,
   castSpell,
   walkThrough,
+  reachable,
   SPELLS,
 } from "../selatrop-portales/js/rules.js";
 
@@ -174,4 +175,19 @@ test("walking into a portal teleports to the exit and closes entry and exit", ()
   const res = walkThrough(portals, "A");
   assert.deepEqual(res.to, { x: 9, y: 1 });
   assert.deepEqual(res.portals.map((p) => p.id), ["B"]);
+});
+
+test("movement stays within PM, routes around obstacles and ends on portals", () => {
+  const state = board({
+    caster: { x: 0, y: 0 },
+    blocked: new Set(["1,0"]),
+    portals: [{ id: "A", x: 0, y: 2 }, { id: "B", x: 9, y: 9 }],
+    entities: [{ id: "t", x: 2, y: 2 }],
+  });
+  const reach = reachable(state, 3);
+  assert.ok(reach.has("1,1"));
+  assert.deepEqual(reach.get("0,2").path, [{ x: 0, y: 1 }, { x: 0, y: 2 }]);
+  assert.equal(reach.has("2,0"), false);
+  assert.equal(reach.has("0,3"), false);
+  assert.equal(reach.has("2,2"), false);
 });
