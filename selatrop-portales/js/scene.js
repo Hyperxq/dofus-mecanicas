@@ -144,7 +144,9 @@ export function createWorld({ canvas, overlay, cols, rows }) {
   const D = 40;
   camera.position.set(D, Math.SQRT2 * D * Math.tan(Math.PI / 6), D);
   camera.lookAt(0, 0, 0);
-  let zoom = 1.12;
+  const START_ZOOM = 1.12;
+  let zoom = START_ZOOM, baseU = 1;
+  const pan = { x: 0, y: 0 };
   let insets = { left: 0, right: 0, top: 0, bottom: 0 };
 
   scene.add(new THREE.HemisphereLight(0xeaf6ff, 0x4a3b22, 2.4));
@@ -692,13 +694,39 @@ export function createWorld({ canvas, overlay, cols, rows }) {
     const innerW = Math.max(120, w - insets.left - insets.right);
     const innerH = Math.max(120, h - insets.top - insets.bottom);
     const u = Math.max((boardW * 1.06) / innerW, (boardH * 1.08) / innerH);
-    const dx = (insets.left - insets.right) / 2, dy = (insets.bottom - insets.top) / 2;
-    camera.left = (-w / 2 - dx) * u;
-    camera.right = (w / 2 - dx) * u;
-    camera.top = (h / 2 - dy) * u + 0.35;
-    camera.bottom = (-h / 2 - dy) * u + 0.35;
+    baseU = u;
+    const limit = boardW * 0.6;
+    pan.x = Math.max(-limit, Math.min(limit, pan.x));
+    pan.y = Math.max(-limit, Math.min(limit, pan.y));
+    // The orthographic camera zooms around the frustum centre, so panning shifts that centre in camera space.
+    const cx = (-(insets.left - insets.right) / 2) * u + pan.x;
+    const cy = (-(insets.bottom - insets.top) / 2) * u + 0.35 + pan.y;
+    camera.left = cx - (w / 2) * u;
+    camera.right = cx + (w / 2) * u;
+    camera.top = cy + (h / 2) * u;
+    camera.bottom = cy - (h / 2) * u;
     camera.zoom = zoom;
     camera.updateProjectionMatrix();
+  }
+
+  function zoomAt(factor, clientX, clientY) {
+    const next = Math.min(3.2, Math.max(0.8, zoom * factor));
+    if (clientX !== undefined) {
+      const r = canvas.getBoundingClientRect();
+      const ox = clientX - r.left - r.width / 2, oy = clientY - r.top - r.height / 2;
+      const diff = baseU / zoom - baseU / next;
+      pan.x += ox * diff;
+      pan.y -= oy * diff;
+    }
+    zoom = next;
+    fit();
+  }
+
+  function panBy(dxPx, dyPx) {
+    const u = baseU / zoom;
+    pan.x -= dxPx * u;
+    pan.y += dyPx * u;
+    fit();
   }
   new ResizeObserver(fit).observe(canvas);
 
@@ -768,7 +796,9 @@ export function createWorld({ canvas, overlay, cols, rows }) {
       if (cell) hover.position.set(wx(cell), 0.03, wz(cell));
     },
     setInsets(next) { insets = next; fit(); },
-    zoomBy(f) { zoom = Math.min(2.6, Math.max(0.8, zoom * f)); fit(); },
+    zoomAt,
+    panBy,
+    resetView() { zoom = START_ZOOM; pan.x = 0; pan.y = 0; fit(); },
     pickCell,
     playCast,
     moveActor,

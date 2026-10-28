@@ -75,13 +75,20 @@
     <h2 class="eyebrow">Último hechizo</h2>
     <p id="result" class="result" aria-live="polite"></p>
     <div class="zoom">
+      <button type="button" id="zoom-reset" class="btn ghost" aria-label="Centrar la cámara">Centrar</button>
       <button type="button" id="zoom-out" class="btn ghost" aria-label="Alejar">−</button>
       <button type="button" id="zoom-in" class="btn ghost" aria-label="Acercar">+</button>
     </div>
   </section>
 
   <div id="bottombar">
-    <nav id="spellbar" class="frame" aria-label="Hechizos"></nav>
+    <section id="preview-card" class="frame preview-card" aria-live="polite" hidden>
+      <p id="pv-title" class="pv-title"></p>
+      <p id="pv-detail" class="pv-detail"></p>
+      <button type="button" id="pv-cast" class="btn primary" hidden>Lanzar</button>
+    </section>
+    <div id="subbar" class="frame subbar" aria-label="Opciones del modo"></div>
+    <nav id="modebar" class="frame modebar" aria-label="Modo"></nav>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

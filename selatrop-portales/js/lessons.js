@@ -12,7 +12,7 @@ export const LESSONS = [
   {
     title: "Abrí tus primeros portales",
     body: `<p>El Selatrop pelea con una red de <b>hasta 4 portales</b>. Cada portal se abre en una casilla libre a <b>1–6 casillas</b> de vos.</p>
-      <p>Elegí el hechizo <b>Portal</b> en la barra de abajo (tecla <kbd>1</kbd>) y tocá una casilla azul.</p>`,
+      <p>Elegí el modo <b>Portales</b> en la barra de abajo (tecla <kbd>2</kbd>) y tocá una casilla azul.</p>`,
     tools: ["portal"],
     move: true,
     setup: () => ({ caster: { x: 7, y: 7 }, portals: [], entities: [], blocked: [] }),
@@ -24,7 +24,7 @@ export const LESSONS = [
   {
     title: "Entrar por uno, salir por otro",
     body: `<p>Para proyectar un hechizo, <b>apuntás a un portal</b>. Ese portal es la <b>entrada</b>. Con dos portales, la salida es siempre el otro.</p>
-      <p>Elegí <b>Golpe</b> (<kbd>2</kbd>) y apuntá al portal <b>A</b>. Mirá la línea punteada: amarillo es tu lanzamiento, celeste la red y verde la salida.</p>`,
+      <p>En el modo <b>Hechizo</b> (<kbd>3</kbd>) con <b>Golpe</b> elegido, pasá por el portal <b>A</b>. La tarjeta de abajo te dice por dónde sale y a quién afectaría. Dorado es tu lanzamiento, celeste la red y verde la salida. Hacé clic para lanzar.</p>`,
     tools: ["golpe"],
     preview: true,
     setup: () => ({ caster: { x: 3, y: 6 }, portals: portals(["A", 5, 5], ["B", 10, 9]), entities: [dummy(1, 12, 8)], blocked: [] }),
@@ -36,10 +36,11 @@ export const LESSONS = [
   {
     title: "El portal copia tu lanzamiento",
     body: `<p>El hechizo sale de la salida con <b>el mismo desplazamiento</b> que usaste para llegar a la entrada. Si apuntás 2 casillas en un eje y 1 en el otro, cae 2 y 1 más allá de la salida.</p>
-      <p>Movete tocando una casilla verde (hasta 6 PM) hasta encontrar la posición desde la que Golpe por <b>A</b> cae sobre el muñeco.</p>`,
+      <p>En el modo <b>Mover</b> (<kbd>1</kbd>) tocá una casilla verde (hasta 6 PM) hasta encontrar la posición desde la que Golpe por <b>A</b> cae sobre el muñeco. Después pasá al modo <b>Hechizo</b>.</p>`,
     tools: ["golpe"],
     move: true,
     preview: true,
+    start: "mover",
     setup: () => ({ caster: { x: 2, y: 9 }, portals: portals(["A", 6, 4], ["B", 9, 11]), entities: [dummy(1, 11, 10)], blocked: [] }),
     objectives: [
       { text: "Movete a otra casilla", done: (ev) => ev.type === "move" },
@@ -93,7 +94,7 @@ export const LESSONS = [
   {
     title: "Línea de visión en dos tramos",
     body: `<p>Un hechizo proyectado necesita línea de visión <b>dos veces</b>: de vos a la entrada, y de la salida al impacto. Los obstáculos y las criaturas la cortan; los portales no.</p>
-      <p>Las casillas azul claro están en alcance pero sin visión. Rodeá la roca para afectar al muñeco a través de <b>A</b>.</p>`,
+      <p>Las casillas azul claro están en alcance pero sin visión. Probá lanzar por <b>A</b>, después rodeá la roca en el modo <b>Mover</b> y volvé a intentarlo.</p>`,
     tools: ["golpe"],
     move: true,
     preview: true,
@@ -111,7 +112,7 @@ export const LESSONS = [
   {
     title: "Áreas a través de portales",
     body: `<p>La zona de un hechizo se dibuja <b>alrededor del impacto</b>, después de salir del portal. Una cruz que sale de un portal afecta a todos los que estén en esa cruz.</p>
-      <p>Usá <b>Cruz</b> (<kbd>3</kbd>) para afectar a los dos muñecos con un solo lanzamiento.</p>`,
+      <p>Usá <b>Cruz</b> para afectar a los dos muñecos con un solo lanzamiento.</p>`,
     tools: ["cruz"],
     move: true,
     preview: true,
@@ -121,7 +122,7 @@ export const LESSONS = [
   {
     title: "Empujar a través de portales",
     body: `<p>Un empuje proyectado empuja en la <b>misma dirección de tu lanzamiento</b>. Si algo choca con un obstáculo, otra criatura o el borde, se frena.</p>
-      <p><b>Insulto</b> (<kbd>4</kbd>) golpea una línea de 3 casillas perpendicular y empuja 2. Mandá al muñeco contra la roca.</p>`,
+      <p><b>Insulto</b> golpea una línea de 3 casillas perpendicular y empuja 2. Mandá al muñeco contra la roca.</p>`,
     tools: ["insulto"],
     move: true,
     preview: true,
@@ -142,7 +143,7 @@ export const LESSONS = [
   {
     title: "Orden de los empujes",
     body: `<p>Cuando un empuje mueve a varios a la vez, el orden importa: el que se mueve primero puede bloquear al siguiente.</p>
-      <p>Según Torrente Arcano, los empujes se resuelven <b>de afuera hacia el centro</b>, en sentido antihorario. <b>Convulsión</b> (<kbd>5</kbd>) es una X: el centro empuja hacia adelante y las esquinas en diagonal.</p>`,
+      <p>Según Torrente Arcano, los empujes se resuelven <b>de afuera hacia el centro</b>, en sentido antihorario. <b>Convulsión</b> es una X: el centro empuja hacia adelante y las esquinas en diagonal.</p>`,
     note: "Aproximación: las distancias de empuje son de ejemplo.",
     tools: ["convulsion"],
     move: true,
@@ -153,7 +154,7 @@ export const LESSONS = [
   {
     title: "Atracciones",
     body: `<p>Las atracciones se resuelven <b>del centro hacia afuera</b>, en sentido horario. Cada criatura se acerca al centro del impacto hasta que choca.</p>
-      <p><b>Shock</b> (<kbd>6</kbd>) golpea un círculo de radio 2 y atrae una casilla hacia el centro. Proyectalo por <b>A</b> sobre el grupo.</p>`,
+      <p><b>Shock</b> golpea un círculo de radio 2 y atrae una casilla hacia el centro. Proyectalo por <b>A</b> sobre el grupo.</p>`,
     note: "Aproximación: la distancia de atracción es de ejemplo.",
     tools: ["shock"],
     move: true,
@@ -173,7 +174,7 @@ export const LESSONS = [
   },
   {
     title: "Neutral e Interrupción",
-    body: `<p><b>Neutral</b> (<kbd>7</kbd>) cierra un solo portal. <b>Interrupción</b> (<kbd>8</kbd>) cierra la red entera.</p>
+    body: `<p>En el modo <b>Portales</b>, tocar un portal lo cierra: eso es <b>Neutral</b>. El botón <b>Cerrar todos</b> es <b>Interrupción</b> y cierra la red entera.</p>
       <p>Cerrar un portal cambia toda la ruta: después de usar Neutral, volvé a calcular desde la entrada.</p>`,
     tools: ["neutral", "interrupcion", "portal"],
     move: true,
@@ -199,7 +200,7 @@ export const LESSONS = [
   {
     title: "Playground",
     body: `<p>Tu mapa, tus reglas. Armá el escenario con las herramientas de <b>Editar mapa</b> y probá redes, áreas, empujes y atracciones.</p>
-      <p>Atajos: <kbd>1</kbd>–<kbd>8</kbd> eligen hechizo, <kbd>Esc</kbd> o clic derecho cancela, y la rueda del mouse hace zoom. Tu escenario se guarda en este navegador.</p>`,
+      <p>Atajos: <kbd>1</kbd> Mover, <kbd>2</kbd> Portales, <kbd>3</kbd> Hechizo y <kbd>4</kbd>–<kbd>8</kbd> eligen hechizo. Arrastrá para mover la cámara; la rueda o el pellizco hacen zoom hacia donde apuntás. Tu escenario se guarda en este navegador.</p>`,
     tools: ["portal", "golpe", "cruz", "insulto", "convulsion", "shock", "neutral", "interrupcion"],
     move: true,
     preview: true,
